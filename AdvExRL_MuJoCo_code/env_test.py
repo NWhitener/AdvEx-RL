@@ -22,7 +22,6 @@ def run(env_name):
     adv_cfg = get_adv_args(env_name) 
     current_path = os.getcwd()
     adv_cfg.logdir = current_path+'/AdvEx_RL_Trained_Models_New/Adversary/'
-    parser = test_parse()
     experiment = Adv_Experiment(env, adv_cfg, test_env)
     experiment.agent_training()
 
