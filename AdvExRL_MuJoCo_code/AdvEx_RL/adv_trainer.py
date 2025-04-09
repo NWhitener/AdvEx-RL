@@ -14,6 +14,7 @@ from AdvEx_RL.memory import ReplayMemory, ConstraintReplayMemory
 import copy
 from matplotlib import pyplot 
 import matplotlib.pyplot as plt
+import test_parse
 
 TORCH_DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -40,7 +41,7 @@ class Adv_Experiment():
         pickle.dump(self.cfg,open(os.path.join(self.logdir, "args.pkl"), "wb"))
         torch.manual_seed(self.cfg.seed)
         np.random.seed(self.cfg.seed)
-        self.env.seed(self.cfg.seed)
+        # self.env.seed(self.cfg.seed)
         # agent_dir = os.path.join(self.logdir, "victim_agent")
         adversary_dir = os.path.join(self.logdir, "adversary_agent")
         self.adversary_agent = SAC(self.agent_observation_space,
@@ -156,6 +157,10 @@ class Adv_Experiment():
         while not done:
             episode_steps += 1
             action = self.adversary_agent.select_action(state, eval=Eval)
+            print("The action that was selected is")
+            print("--------------------------")
+            print(action)
+            print("--------------------------")
             next_state, _, done, info = self.env.step(action)
             adv_r = float(info['adv_reward'])
             epi_adv_reward += adv_r
