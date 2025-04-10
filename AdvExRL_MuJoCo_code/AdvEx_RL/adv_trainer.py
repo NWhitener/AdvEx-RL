@@ -14,7 +14,7 @@ from AdvEx_RL.memory import ReplayMemory, ConstraintReplayMemory
 import copy
 from matplotlib import pyplot 
 import matplotlib.pyplot as plt
-from test_parse import parser
+from parser import parser 
 
 TORCH_DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -159,9 +159,9 @@ class Adv_Experiment():
             action = self.adversary_agent.select_action(state, eval=Eval)
             next_state, _, done, info = self.env.step(action)
             adv_r = float(info['adv_reward'])
-            parsed = parser(next_state, action)
-            parsed.create_sentence_action()
-            print(parsed.action_sentence)
+            parsed = parser(next_state, action, self.env.caution_zone)
+            parsed.create_text_description()
+            print(parsed.text_description)
             epi_adv_reward += adv_r
             self.total_numsteps += 1
             mask = int(not done)

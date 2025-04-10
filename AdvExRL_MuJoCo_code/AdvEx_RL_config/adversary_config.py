@@ -78,7 +78,7 @@ def parse_nav2():
     parser.add_argument('--seed', type=int, default=123456, help='random seed (default: 123456)')
     parser.add_argument('--train_start', type=int, default=10, help='No of episode to start training')
     parser.add_argument('--num_steps', type=int, default=10, help='maximum number of steps (default: 1000000)')
-    parser.add_argument('--num_eps', type=int, default=10, help='maximum number of episodes (default: 1000000)')
+    parser.add_argument('--num_eps', type=int, default=1, help='maximum number of episodes (default: 1000000)')
     parser.add_argument('--model_path', default='runs', help='exterior log directory')
     #===============================================================
     parser.add_argument('--hidden_size', type=int, default=512, help='hidden size (default: 256)')
