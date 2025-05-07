@@ -76,7 +76,6 @@ class parser():
         self.create_sentence_action()
         self.find_sub_quadrant()
         self.is_action_in_caution()
-
         text_description = self.action_sentence + '. The agent is in the ' + self.observation_sub_quad +' of the environment.'
         if self.in_caution: 
             text_description = text_description + '. The agent is in the caution zone'

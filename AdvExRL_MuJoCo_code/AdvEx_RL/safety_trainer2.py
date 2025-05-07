@@ -107,6 +107,10 @@ class Safety_trainer():
 
         self.high_reward_thresh  = 0.5
         self.low_reward_thresh   = -0.5
+
+        self.llm_safety_epsilon      = 1.0   
+        self.llm_safety_epsilon_min  = 0.05   
+        self.llm_safety_decay        = 0.995 
 #******************************************************************************************************************
         
     def agent_training(self):
@@ -181,10 +185,11 @@ class Safety_trainer():
                 task_rec_plot_dir= os.path.join(plot_dir, 'task_rec_reward_plot')
                 self.plot_task_safety_reward(task_safety_reward, task_count, safety_count, only_tsk_reward_vec, task_rec_plot_dir)
                 #------------------------------------------------
-            self.llm_epsilon = max(
-                 self.llm_epsilon_min,
-                self.llm_epsilon * self.llm_epsilon_decay
-                )
+            self.llm_safety_epsilon = max(
+                self.llm_safety_epsilon_min,
+                self.llm_safety_epsilon * self.llm_safety_decay
+            )
+
     
     def run_safety_train_episode(self):
         #****************************************
@@ -271,41 +276,46 @@ class Safety_trainer():
         
   #==============================================================
     def safety_trajectory(self, env, init_state):
-        # env.reversed_reward=True #Just to increase one step at absorbing state
-        episode_safety_ratio = 0
-        episode_steps = 0
-        if self.cfg.env_name =="maze":
-            env.set_state_to_target(init_state)
-            state = init_state
-        else:
-            # env.extended_abs = True
-            env.set_curr_state(init_state)
-            state = init_state
-        safety = 0
+        state = init_state.copy()
+        env.set_state(init_state) if hasattr(env, 'set_state') else None
         done = False
-        unsafe_count = 0
-        episode_reward=0
+        steps = 0
+        unsafe = 0
+        total_reward = 0.0
+        llama = llama_interact()
         while not done:
-            episode_steps+=1
-            action = self.safety_agent.select_action(state, eval=False)
-            next_state, reward, done, info = env.step(action)
-            penalty = info['adv_reward']
-            unsafe_count+=penalty
-            episode_reward+=reward
-            mask = float(not done)
-            self.safety_constrained_memory.push(state, action, reward, penalty, next_state, mask)
-            state = next_state
-            done =done or episode_steps==env._max_episode_steps
-            if done:
-                if unsafe_count>0:
-                    safety=0
-                else:
-                    safety=1
-                episode_safety_ratio=episode_steps/env._max_episode_steps
-                break
+            steps += 1
+            # epsilon-greedy between LLM and learned safety policy
+            if np.random.rand() < self.llm_safety_epsilon:
+                action = llama.ask_question(self._build_prompt(state))
+                nums = list(map(float, re.findall(r"[-+]?\d*\.\d+|\d+", action)))
+                action = np.array(nums[-2:])
+                print(action)
+            else:
+                action = self.safety_agent.select_action(state, eval=False)
 
-        return episode_reward, safety, episode_safety_ratio
+            next_state, reward, done, info = env.step(action)
+            penalty = info.get('adv_reward', 0)
+            unsafe += penalty
+            total_reward += reward
+
+            mask = float(not done)
+            self.safety_buffer.push(state, action, reward, penalty, next_state, mask)
+
+            state = next_state
+            done = done or (steps == env._max_episode_steps)
+
+        safety_flag = 1 if unsafe == 0 else 0
+        safety_ratio = steps / env._max_episode_steps
+        return safety_flag, safety_ratio
 #==============================================================
+
+    def _build_prompt(self, state):
+        parser = Nav2Predicates()
+        binary = parser.state_to_binary(state)
+        loc = parser.translate_state(binary)
+        return f"I am currently here: {loc}. Which action should I take?"
+
     def run_safety_eval_episode(self):
         episode_safety_ratio = 0
         episode_steps = 0

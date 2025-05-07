@@ -82,7 +82,7 @@ def parse_nav2():
     parser.add_argument('--num_eps', type=int, default=1000000, help='maximum number of episodes (default: 1000000)')
     parser.add_argument('--model_path', default='None', help='Loaded model dir')
     #=======================SAC======================================================
-    parser.add_argument('--saved_model_path', default='/AdvEx_RL_Trained_Models/Victim/Jul-27-2022|21:56|PM_SAC_nav2_Gaussian/victim_agent/Agent_model/Best_Agent_Model/DateTime_Jul-27-2022_reward_-6.407141558867541', help='exterior log directory')
+    parser.add_argument('--saved_model_path', default='/AdvEx_RL_Trained_Models/Victim/Jul-27-2022_21_56_PM_SAC_nav2_Gaussian/victim_agent/Agent_model/Best_Agent_Model/DateTime_Jul-27-2022_reward_-6.407141558867541', help='exterior log directory')
     parser.add_argument('--hidden_size', type=int, default=512, help='hidden size (default: 256)')
     #=========================================================================================================
     parser.add_argument('--gamma',type=float,default=0.99,help='discount factor for reward (default: 0.99)')

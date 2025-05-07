@@ -14,7 +14,9 @@ from AdvEx_RL.memory import ReplayMemory, ConstraintReplayMemory
 import copy
 from matplotlib import pyplot 
 import matplotlib.pyplot as plt
-from parser import parser 
+from parser2 import Nav2Predicates
+from llama_agent_connect import llama_interact
+import re
 
 TORCH_DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -147,6 +149,8 @@ class Adv_Experiment():
                       np.save(f, np.array(critic_val_vector))
 
     def run_adv_agent_episode(self, Eval=False, iter_no=None):
+        llama = llama_interact()
+
         episode_reward = 0
         total_adv_reward = 0
         epi_adv_reward = 0
@@ -154,14 +158,34 @@ class Adv_Experiment():
         done = False
         state = self.env.reset()
         self.episode_count+=1
+        last_action = None
         while not done:
             episode_steps += 1
-            action = self.adversary_agent.select_action(state, eval=Eval)
+            parse = Nav2Predicates()
+            binary_set = parse.state_to_binary(state)
+            loc = parse.translate_state(binary_set)
+            question = f'I am currently here: {loc} what action should I take?'
+            action = llama.ask_question(question)
+            nums = list(map(float, re.findall(r"[-+]?\d*\.\d+|\d+", action)))
+            action = np.array(nums[-2:])
+            print(action, last_action)
+            if np.array_equal(action, last_action): 
+                print("I am here in the code")
+                question = f'I am currently here: {loc} what action should I take? Please give me an action that I have not taken recently'
+                action = llama.ask_question(question)
+                nums = list(map(float, re.findall(r"[-+]?\d*\.\d+|\d+", action)))
+                action = np.array(nums[-2:])
+
             next_state, _, done, info = self.env.step(action)
+            print(next_state)
+            if len(llama.replay_buffer_base) < 10: 
+                llama.replay_buffer_base.append((state, action))
+            else: 
+                del llama.replay_buffer_base[0]
+                llama.replay_buffer_base.append((state,action))
+            llama.build_chat_hist()
+            print("Took an Action")
             adv_r = float(info['adv_reward'])
-            parsed = parser(next_state, action, self.env.caution_zone)
-            parsed.create_text_description()
-            print(parsed.text_description)
             epi_adv_reward += adv_r
             self.total_numsteps += 1
             mask = int(not done)
@@ -171,6 +195,8 @@ class Adv_Experiment():
             self.adv_critic_memory.push(state, action, adv_r, next_state, mask)
             #**********************************************************
             state = next_state
+            last_action = action
+            action = None
             if done:
                 break
         return adv_r

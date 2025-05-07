@@ -81,8 +81,8 @@ class Safety_trainer():
         #------------------------------------------------------------------
         torch.manual_seed(self.cfg.seed)
         np.random.seed(self.cfg.seed)
-        # self.env.seed(self.cfg.seed)
-        # self.test_env.seed(self.cfg.seed)
+        self.env.seed(self.cfg.seed)
+        self.test_env.seed(self.cfg.seed)
         #++++++++++++++++++++++++++++++++++++++++++
         self.safety_constrained_memory = ConstraintReplayMemory(10000, self.cfg.seed)
         #++++++++++++++++++++++++++++++++++++++++++
@@ -105,8 +105,6 @@ class Safety_trainer():
         self.llm_epsilon_decay = 0.995
         self.llm_epsilon_min = 0.05
 
-        self.high_reward_thresh  = 0.5
-        self.low_reward_thresh   = -0.5
 #******************************************************************************************************************
         
     def agent_training(self):
@@ -180,11 +178,11 @@ class Safety_trainer():
                     os.makedirs(plot_dir)
                 task_rec_plot_dir= os.path.join(plot_dir, 'task_rec_reward_plot')
                 self.plot_task_safety_reward(task_safety_reward, task_count, safety_count, only_tsk_reward_vec, task_rec_plot_dir)
-                #------------------------------------------------
             self.llm_epsilon = max(
                  self.llm_epsilon_min,
                 self.llm_epsilon * self.llm_epsilon_decay
                 )
+                #------------------------------------------------
     
     def run_safety_train_episode(self):
         #****************************************
@@ -201,14 +199,11 @@ class Safety_trainer():
 
   #====================================================================
     def rollout_trajectory(self, rec_iter=1):
-        llama = llama_interact()
         safety = 0
         safety_ratio = 0
         episode_steps = 0
         state = self.env.reset()
         done = False
-        last_action = None
-        last_reward = None
         while not done:
             episode_steps+=1
             tmp_env = copy.deepcopy(self.env)
@@ -218,27 +213,15 @@ class Safety_trainer():
                 safety_ratio+=sfr
             safety=safety/rec_iter
             safety_ratio=safety_ratio/rec_iter
-            if np.random.rand() < self.llm_epsilon:  
+            if np.random.rand() < self.llm_epsilon: 
                 parse = Nav2Predicates()
                 binary_set = parse.state_to_binary(state)
                 loc = parse.translate_state(binary_set)
-                print("---------")
-                print(f"Current State {state}")
                 question = f'I am currently here: {loc} what action should I take?'
                 action = llama.ask_question(question)
+                print(question)
                 nums = list(map(float, re.findall(r"[-+]?\d*\.\d+|\d+", action)))
                 action = np.array(nums[-2:])
-                if np.array_equal(action, last_action): 
-                    print("I am here in the code")
-                    question = f'I am currently here: {loc} what action should I take? Please give me an action that I have not taken recently'
-                    action = llama.ask_question(question)
-                    nums = list(map(float, re.findall(r"[-+]?\d*\.\d+|\d+", action)))
-                    action = np.array(nums[-2:])
-                if len(llama.replay_buffer_base) < 50: 
-                    llama.replay_buffer_base.append((state, action))
-                else: 
-                    del llama.replay_buffer_base[0]
-                    llama.replay_buffer_base.append((state,action))
             else:
                 if np.random.rand()>self.eta:
                     action = self.safety_agent.adv_critic.select_action(state, eval=True)
@@ -246,27 +229,15 @@ class Safety_trainer():
                     action = self.select_random_action(self.env)
 
             next_state, reward, done, _ = self.env.step(action)
-            print(f"Reward: {reward}")
-
-            if last_reward is not None:
-                delta = abs(reward - last_reward)
-                if delta >= 0.5:
-                # append (state, action, reward) to important_buffer
-                    if len(llama.important_buffer) >= 10:
-                        llama.important_buffer.pop(0)
-                    llama.important_buffer.append((
-                        state.copy(),
-                        action.copy(),
-                        reward
-                    ))
             # episode_reward+=reward
+            if reward >= self.high_reward_thresh or reward <= self.low_reward_thresh:
+                self.important_buffer.append((state.copy(), action.copy(), reward))
             state = next_state
             done =done or episode_steps==self.env._max_episode_steps
-            last_action = action
-            last_reward = reward
-            action = None
             if done:
                 break
+
+
         return safety/episode_steps, safety_ratio/episode_steps
         
   #==============================================================
