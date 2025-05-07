@@ -4,13 +4,15 @@ import math
 
 class Nav2Predicates():
     def __init__(self):
-        #Parse the Action
+        #Parse the Action, need a left/right and up/down
         self.action_left_right = None 
         self.action_up_down = None
         self.action_left_right_word = None
         self.action_up_down_word = None
         self.magnitude = None
         self.action_sentence = None
+
+        #For state parsing
         self.attr_names = ['X_cord', 'Y_cord']
         self.language_set = np.array(['In border zone',
                         'At the start',
@@ -26,7 +28,7 @@ class Nav2Predicates():
                         'Very close to risk area',
                         'In risk area',
                         ])
-
+    #Builds paring instructions
     def predicate_set(self):
         predicates = [{'true': 'In border zone', 'false': 'Not in border zone'},
                 {'true': 'At the start', 'false': 'Not at the start'},
@@ -43,7 +45,7 @@ class Nav2Predicates():
                 {'true': 'In risk area', 'false': 'Not in risk area'}]
     
         return predicates
-     
+    #Converts the state to a representation
     def state_to_binary(self, state):
         binary_set = [self.border(state),
                 self.at_start(state),
@@ -61,7 +63,7 @@ class Nav2Predicates():
         
         #print("state {} and binary state {} ".format(state, np.array(binary_set)))
         return np.array(binary_set)
-    
+    #Adds language
     def translate_state(self, binary_set):
         language_set = np.array(['In border zone',
                     'At the start',
@@ -90,6 +92,10 @@ class Nav2Predicates():
         
         return string
 
+
+    ##################################################
+    #The following methods define the state locations#
+    ##################################################
 
     def feat_groups(self):
         #groups = [[0, 1, 2, 3, 4, 5, 6, 7, 8]]
@@ -191,6 +197,10 @@ class Nav2Predicates():
         else:
             return 0
 
+    ##############################################
+    #The following parse the action to a sentence#
+    ##############################################
+
     def parse_action_to_directions(self): 
         #See if the action is left or right
         if self.action_left_right < 0: 
@@ -206,9 +216,9 @@ class Nav2Predicates():
 
     def calc_magnitude(self): 
         #Calculates the magnitude of the action 
-
         self.magnitude = round(math.sqrt((self.action_left_right**2) + (self.action_up_down **2)),2)
 
+    #Combines the words into a sentence
     def create_sentence_action(self): 
         self.parse_action_to_directions()
         self.calc_magnitude()

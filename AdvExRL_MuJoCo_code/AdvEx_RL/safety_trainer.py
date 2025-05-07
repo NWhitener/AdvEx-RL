@@ -181,6 +181,7 @@ class Safety_trainer():
                 task_rec_plot_dir= os.path.join(plot_dir, 'task_rec_reward_plot')
                 self.plot_task_safety_reward(task_safety_reward, task_count, safety_count, only_tsk_reward_vec, task_rec_plot_dir)
                 #------------------------------------------------
+            #Decay epsilon
             self.llm_epsilon = max(
                  self.llm_epsilon_min,
                 self.llm_epsilon * self.llm_epsilon_decay
@@ -218,22 +219,30 @@ class Safety_trainer():
                 safety_ratio+=sfr
             safety=safety/rec_iter
             safety_ratio=safety_ratio/rec_iter
+
+            #E greedy approach 
             if np.random.rand() < self.llm_epsilon:  
                 parse = Nav2Predicates()
                 binary_set = parse.state_to_binary(state)
                 loc = parse.translate_state(binary_set)
+                #Debugging Printout
                 print("---------")
                 print(f"Current State {state}")
                 question = f'I am currently here: {loc} what action should I take?'
+               
+                #Get an action from the LLM 
                 action = llama.ask_question(question)
+                #Parse action out
                 nums = list(map(float, re.findall(r"[-+]?\d*\.\d+|\d+", action)))
                 action = np.array(nums[-2:])
+                #If we have taken this action too recently reprompt
                 if np.array_equal(action, last_action): 
                     print("I am here in the code")
                     question = f'I am currently here: {loc} what action should I take? Please give me an action that I have not taken recently'
                     action = llama.ask_question(question)
                     nums = list(map(float, re.findall(r"[-+]?\d*\.\d+|\d+", action)))
                     action = np.array(nums[-2:])
+                #Add to the replay buffer if necessary
                 if len(llama.replay_buffer_base) < 50: 
                     llama.replay_buffer_base.append((state, action))
                 else: 
@@ -247,7 +256,7 @@ class Safety_trainer():
 
             next_state, reward, done, _ = self.env.step(action)
             print(f"Reward: {reward}")
-
+            #Importance buffer
             if last_reward is not None:
                 delta = abs(reward - last_reward)
                 if delta >= 0.5:
